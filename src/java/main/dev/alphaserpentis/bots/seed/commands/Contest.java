@@ -54,6 +54,14 @@ public class Contest extends BotCommand<MessageEmbed> {
             switch(subcommand) {
                 case "start" -> startContest(guild, eb);
                 case "end" -> endContest(guild, eb);
+                case "addperm" -> addPermission(guild, event.getOptions().get(0).getAsLong(), eb);
+                case "removeperm" -> removePermission(guild, event.getOptions().get(0).getAsLong(), eb);
+                case "addprompt" -> addPrompt(guild, event.getOptions().get(0).getAsString(), eb);
+                case "removeprompt" -> removePrompt(guild, event.getOptions().get(0).getAsString(), eb);
+                case "leaderboard" -> setLeaderboardChannel(guild, event.getOptions().get(0).getAsLong(), eb);
+                case "channel" -> setContestChannel(guild, event.getOptions().get(0).getAsLong(), eb);
+                case "length" -> setContestLength(guild, event.getOptions().get(0).getAsLong(), eb);
+                case "recurring" -> setContestRecurring(guild, event.getOptions().get(0).getAsBoolean(), eb);
             }
         }
 
@@ -72,7 +80,7 @@ public class Contest extends BotCommand<MessageEmbed> {
                         new SubcommandData("removeprompt", "Removes a prompt from the list of prompts.").addOption(OptionType.STRING, "prompt", "The prompt to remove.", true),
                         new SubcommandData("leaderboard", "Sets the channel where the leaderboard will be at").addOption(OptionType.CHANNEL, "channel", "The channel to set.", true),
                         new SubcommandData("channel", "Sets the channel where the contest will be at").addOption(OptionType.CHANNEL, "channel", "The channel to set.", true),
-                        new SubcommandData("length", "Sets the default length of the contest in days").addOption(OptionType.INTEGER, "days", "The number of days to set.", true),
+                        new SubcommandData("length", "Sets the length of the contest in days").addOption(OptionType.INTEGER, "days", "The number of days to set.", true),
                         new SubcommandData("recurring", "Sets whether the contest will be recurring or not").addOption(OptionType.BOOLEAN, "recurring", "Whether the contest will be recurring or not.", true)
                 );
 
@@ -120,5 +128,97 @@ public class Contest extends BotCommand<MessageEmbed> {
             eb.setDescription("There is no contest running.");
             eb.setColor(0xff0000);
         }
+    }
+
+    private void addPermission(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb) {
+        // Determine if id is a user or a role
+        try {
+            guild.retrieveMemberById(id).queue((member) -> {
+                // It's a user
+                SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+                serverData.addPermissionedUser(id);
+                eb.setDescription("The user has been added to the list of permissioned users.");
+                eb.setColor(0x00ff00);
+            }, (failure) -> {
+                // Verify that the id is a role and doesn't throw
+                if(guild.getRoleById(id) == null) {
+                    throw new NullPointerException("The mentionable could not be found.");
+                }
+                SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+                serverData.addPermissionedRole(id);
+                eb.setDescription("The role has been added to the list of permissioned roles.");
+                eb.setColor(0x00ff00);
+            });
+        } catch(NullPointerException e) {
+            eb.setDescription("The mentionable could not be found.");
+            eb.setColor(0xff0000);
+        }
+    }
+
+    private void removePermission(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb) {
+        // Determine if id is a user or a role
+        try {
+            guild.retrieveMemberById(id).queue((member) -> {
+                // It's a user
+                SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+                serverData.removePermissionedUser(id);
+                eb.setDescription("The user has been removed from the list of permissioned users.");
+                eb.setColor(0x00ff00);
+            }, (failure) -> {
+                // Verify that the id is a role and doesn't throw
+                if(guild.getRoleById(id) == null) {
+                    throw new NullPointerException("The mentionable could not be found.");
+                }
+                SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+                serverData.removePermissionedRole(id);
+                eb.setDescription("The role has been removed from the list of permissioned roles.");
+                eb.setColor(0x00ff00);
+            });
+        } catch(NullPointerException e) {
+            eb.setDescription("The mentionable could not be found.");
+            eb.setColor(0xff0000);
+        }
+    }
+
+    private void addPrompt(@NonNull Guild guild, @NonNull String prompt, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.addPrompt(prompt);
+        eb.setDescription("The prompt has been added to the list of prompts.");
+        eb.setColor(0x00ff00);
+    }
+
+    private void removePrompt(@NonNull Guild guild, @NonNull String prompt, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.removePrompt(prompt);
+        eb.setDescription("The prompt has been removed from the list of prompts.");
+        eb.setColor(0x00ff00);
+    }
+
+    private void setLeaderboardChannel(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.setLeaderboardChannelId(id);
+        eb.setDescription("The leaderboard channel has been set.");
+        eb.setColor(0x00ff00);
+    }
+
+    private void setContestChannel(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.setContestChannelId(id);
+        eb.setDescription("The contest channel has been set.");
+        eb.setColor(0x00ff00);
+    }
+
+    private void setContestLength(@NonNull Guild guild, long days, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.setLengthOfContestInSeconds(days * 24 * 60 * 60);
+        eb.setDescription("The contest length has been set.");
+        eb.setColor(0x00ff00);
+    }
+
+    private void setContestRecurring(@NonNull Guild guild, boolean recurring, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        serverData.setContestRecurring(recurring);
+        eb.setDescription("The recurring contest setting has been set.");
+        eb.setColor(0x00ff00);
     }
 }

@@ -86,6 +86,24 @@ public class SeedServerData extends ServerData {
         previouslyUsedPrompts[1] = previouslyUsedPrompts[2];
         previouslyUsedPrompts[2] = prompt;
     }
+    public void addPermissionedUser(long userId) {
+        permissionedUsers.add(userId);
+    }
+    public void removePermissionedUser(long userId) {
+        permissionedUsers.remove(userId);
+    }
+    public void addPermissionedRole(long roleId) {
+        permissionedRoles.add(roleId);
+    }
+    public void removePermissionedRole(long roleId) {
+        permissionedRoles.remove(roleId);
+    }
+    public void addPrompt(@NonNull String prompt) {
+        prompts.add(prompt);
+    }
+    public void removePrompt(@NonNull String prompt) {
+        prompts.remove(prompt);
+    }
 
     public boolean isMemberPermissioned(@NonNull Member member) {
         if(getPermissionedUsers().contains(member.getIdLong())) {
