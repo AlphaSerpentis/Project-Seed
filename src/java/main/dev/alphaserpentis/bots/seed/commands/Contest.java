@@ -8,11 +8,14 @@ import dev.alphaserpentis.coffeecore.handler.api.discord.servers.ServerDataHandl
 import io.reactivex.rxjava3.annotations.NonNull;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
+
+import java.io.IOException;
 
 public class Contest extends BotCommand<MessageEmbed> {
 
@@ -40,7 +43,8 @@ public class Contest extends BotCommand<MessageEmbed> {
         EmbedBuilder eb = new EmbedBuilder();
         String subcommand = event.getSubcommandName();
         String subcommandGroup = event.getSubcommandGroup();
-        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(event.getGuild().getIdLong());
+        Guild guild = event.getGuild();
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
 
         if(subcommandGroup.equalsIgnoreCase("config")) {
             if(!serverData.isMemberPermissioned(event.getMember())) {
@@ -48,8 +52,8 @@ public class Contest extends BotCommand<MessageEmbed> {
             }
 
             switch(subcommand) {
-                case "start" -> startContest(event.getGuild().getIdLong(), eb);
-                case "end" -> {}
+                case "start" -> startContest(guild, eb);
+                case "end" -> endContest(guild, eb);
             }
         }
 
@@ -75,8 +79,8 @@ public class Contest extends BotCommand<MessageEmbed> {
         jda.upsertCommand(name, description).addSubcommandGroups(config).queue((cmd) -> setCommandId(cmd.getIdLong()));
     }
 
-    private void startContest(long guildId, @NonNull EmbedBuilder eb) {
-        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guildId);
+    private void startContest(@NonNull Guild guild, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
         if(ContestHandler.verifyConfiguration(serverData)) {
             if(serverData.isContestRunning()) {
                 eb.setDescription("A contest is already running.");
@@ -84,9 +88,36 @@ public class Contest extends BotCommand<MessageEmbed> {
             } else {
                 eb.setDescription("The contest has been started.");
                 eb.setColor(0x00ff00);
+
+                try {
+                    ContestHandler.startContest(guild, serverData);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         } else {
-            eb.setDescription("The contest cannot be started because the configuration is not complete. Ensure that the leaderboard channel and contest channel are set.");
+            eb.setDescription(
+                    "The contest cannot be started because the configuration is not complete. " +
+                            "Ensure that the leaderboard channel and contest channel are set." +
+                            "Run </contest config leaderboard:" + getCommandId() + "> and </contest config channel:" + getCommandId() + "> to set them."
+            );
+            eb.setColor(0xff0000);
+        }
+    }
+
+    private void endContest(@NonNull Guild guild, @NonNull EmbedBuilder eb) {
+        SeedServerData serverData = (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong());
+        if(serverData.isContestRunning()) {
+            eb.setDescription("The contest has been ended.");
+            eb.setColor(0x00ff00);
+
+            try {
+                ContestHandler.endContest(guild, serverData);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            eb.setDescription("There is no contest running.");
             eb.setColor(0xff0000);
         }
     }

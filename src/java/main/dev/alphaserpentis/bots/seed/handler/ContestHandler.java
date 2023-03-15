@@ -1,27 +1,92 @@
 package dev.alphaserpentis.bots.seed.handler;
 
+import dev.alphaserpentis.bots.seed.data.contest.SeedContestResults;
 import dev.alphaserpentis.bots.seed.data.server.SeedServerData;
 import dev.alphaserpentis.coffeecore.handler.api.discord.servers.ServerDataHandler;
 import io.reactivex.rxjava3.annotations.NonNull;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageHistory;
+import net.dv8tion.jda.api.entities.MessageReaction;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ContestHandler {
 
+    public static ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(1);
+    public static ScheduledFuture<?> scheduledFuture;
+    public static JDA jda;
+
+    public static void init(@NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
+        jda = guild.getJDA();
+
+        if(serverData.isContestRunning()) {
+            // Verify the contest is still running
+            if(serverData.getContestEndingTimestamp() <= System.currentTimeMillis() / 1000) {
+                endContest(guild, serverData);
+                if(serverData.isContestRecurring()) {
+                    startContest(guild, serverData);
+                } else {
+                    serverData.setContestStartingTimestamp(0);
+                    serverData.setContestEndingTimestamp(0);
+
+                    endContest(guild, serverData);
+                }
+            } else {
+                scheduledFuture = executorService.schedule(
+                        () -> {
+                            try {
+                                endContest(guild, serverData);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        },
+                        serverData.getContestEndingTimestamp() - System.currentTimeMillis() / 1000,
+                        TimeUnit.SECONDS
+                );
+            }
+        }
+    }
+
     public static void startContest(@NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
         EmbedBuilder eb = new EmbedBuilder();
+        long currentTimeInSeconds = System.currentTimeMillis() / 1000;
+        String prompt = serverData.getContestPrompt();
 
         serverData.setContestEndingTimestamp(
-                System.currentTimeMillis() / 1000 + serverData.getLengthOfContestInSeconds()
+                currentTimeInSeconds + serverData.getLengthOfContestInSeconds()
         );
-
+        serverData.setContestStartingTimestamp(currentTimeInSeconds);
+        serverData.addPromptToPreviouslyUsedPrompts(prompt);
         ServerDataHandler.updateServerData();
+
+        // Schedule the end of the contest
+        scheduledFuture = executorService.schedule(
+                () -> {
+                    try {
+                        endContest(guild, serverData);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                },
+                serverData.getLengthOfContestInSeconds(),
+                TimeUnit.SECONDS
+        );
 
         // Construct the MessageEmbed
         eb.setTitle("Contest Started");
-        eb.setDescription("A new contest has started! The prompt for this contest is: " + serverData.getContestPrompt());
+        eb.setDescription("A new contest has started! The prompt for this contest is: " + prompt);
         eb.addField(
                 "Submitting Your Seed?",
                 "To submit your seed, simply upload your seed to this channel! If you submit more than one seed, the highest-scoring seed will be used.",
@@ -43,8 +108,114 @@ public class ContestHandler {
                 eb.build()
         ).complete();
     }
+    public static void endContest(@NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
+        EmbedBuilder eb = new EmbedBuilder();
+
+        scheduledFuture.cancel(false);
+
+        // Set the contest results
+        HashMap<Long, Integer> participants = getContestParticipants(serverData);
+        SeedContestResults contestResults = new SeedContestResults(
+                participants,
+                serverData.getContestPrompt(),
+                serverData.getContestStartingTimestamp(),
+                serverData.getContestEndingTimestamp(),
+                serverData.getContestResults().size() + 1
+        );
+
+        // Construct the MessageEmbed
+        eb.setTitle("Final Results");
+        eb.setDescription("The contest has ended! Here are the final results:");
+        eb.addField(
+                "Prompt",
+                serverData.getContestPrompt(),
+                false
+        );
+        for(int i = 0; i < contestResults.getParticipants().size() && i < 5; i++) {
+            long userId = contestResults.getParticipants().get(i);
+            eb.addField(
+                    "Place " + (i + 1),
+                    "<@" + userId + "> with " + contestResults.participants().get(userId) + " votes",
+                    false
+            );
+        }
+
+        // Send messsage to the channel
+        guild.getTextChannelById(serverData.getContestChannelId()).sendMessageEmbeds(
+                eb.build()
+        ).complete();
+
+        serverData.addContestResults(contestResults);
+
+        if(serverData.isContestRecurring()) {
+            startContest(guild, serverData);
+        } else {
+            serverData.setContestStartingTimestamp(0);
+            serverData.setContestEndingTimestamp(0);
+            ServerDataHandler.updateServerData();
+        }
+    }
 
     public static boolean verifyConfiguration(@NonNull SeedServerData serverData) {
         return serverData.getContestChannelId() != 0 && serverData.getLeaderboardChannelId() != 0;
+    }
+
+    public static HashMap<Long, Integer> getContestParticipants(@NonNull SeedServerData serverData) {
+        HashMap<Long, Integer> participants = new HashMap<>();
+        ArrayList<Message> eligibleMessages = new ArrayList<>();
+        MessageChannel contestChannel = jda.getTextChannelById(serverData.getContestChannelId());
+        MessageHistory messageHistory;
+        AtomicBoolean messagePastTimestamp = new AtomicBoolean(false);
+
+        // Start search after the contest started message
+        messageHistory = contestChannel.getHistoryBefore(
+                contestChannel.getLatestMessageId(),
+                100
+        ).complete();
+
+        while(!messagePastTimestamp.get()) {
+            messageHistory.getRetrievedHistory().forEach(
+                    message -> {
+                        if(message.getTimeCreated().toInstant().getEpochSecond() > serverData.getContestStartingTimestamp()) {
+                            if(message.getAttachments().size() > 0)
+                                eligibleMessages.add(message);
+                        } else {
+                            messagePastTimestamp.set(true);
+                        }
+                    }
+            );
+
+            if(!messagePastTimestamp.get()) {
+                messageHistory = contestChannel.getHistoryBefore(
+                        messageHistory.getRetrievedHistory().get(0).getId(),
+                        100
+                ).complete();
+            }
+        }
+
+        for(Message msg: eligibleMessages) {
+            participants.put(msg.getAuthor().getIdLong(), countVotes(msg));
+        }
+
+        return participants;
+    }
+
+    public static int countVotes(@NonNull Message message) {
+        ArrayList<MessageReaction> reactions = new ArrayList<>(message.getReactions());
+        HashMap<Long, Boolean> voters = new HashMap<>();
+        AtomicInteger votes = new AtomicInteger();
+
+        for(MessageReaction reaction: reactions) {
+            reaction.retrieveUsers().complete().forEach(
+                    user -> {
+                        if(!voters.containsKey(user.getIdLong())) {
+                            voters.put(user.getIdLong(), true);
+                            votes.getAndIncrement();
+                        }
+                    }
+            );
+        }
+
+        return votes.get();
     }
 }

@@ -13,8 +13,10 @@ public class SeedServerData extends ServerData {
     private ArrayList<Long> permissionedUsers = new ArrayList<>();
     private ArrayList<Long> permissionedRoles = new ArrayList<>();
     private ArrayList<String> prompts = new ArrayList<>();
+    private String[] previouslyUsedPrompts = new String[3];
     private long leaderboardChannelId = 0;
     private long contestChannelId = 0;
+    private long contestStartingTimestamp = 0;
     private long contestEndingTimestamp = 0;
     private long lengthOfContestInSeconds = 604800;
     private boolean isContestRecurring = false;
@@ -45,6 +47,9 @@ public class SeedServerData extends ServerData {
     public long getContestChannelId() {
         return contestChannelId;
     }
+    public long getContestStartingTimestamp() {
+        return contestStartingTimestamp;
+    }
     public long getContestEndingTimestamp() {
         return contestEndingTimestamp;
     }
@@ -60,6 +65,9 @@ public class SeedServerData extends ServerData {
     public void setContestChannelId(long contestChannelId) {
         this.contestChannelId = contestChannelId;
     }
+    public void setContestStartingTimestamp(long contestStartingTimestamp) {
+        this.contestStartingTimestamp = contestStartingTimestamp;
+    }
     public void setContestEndingTimestamp(long contestEndingTimestamp) {
         this.contestEndingTimestamp = contestEndingTimestamp;
     }
@@ -68,6 +76,15 @@ public class SeedServerData extends ServerData {
     }
     public void setContestRecurring(boolean contestRecurring) {
         isContestRecurring = contestRecurring;
+    }
+
+    public void addContestResults(@NonNull SeedContestResults contestResults) {
+        this.contestResults.add(contestResults);
+    }
+    public void addPromptToPreviouslyUsedPrompts(@NonNull String prompt) {
+        previouslyUsedPrompts[0] = previouslyUsedPrompts[1];
+        previouslyUsedPrompts[1] = previouslyUsedPrompts[2];
+        previouslyUsedPrompts[2] = prompt;
     }
 
     public boolean isMemberPermissioned(@NonNull Member member) {

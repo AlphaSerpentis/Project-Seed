@@ -1,24 +1,31 @@
 package dev.alphaserpentis.bots.seed.data.contest;
 
+import io.reactivex.rxjava3.annotations.NonNull;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
  * A record that stores the results of the contest
  * @param participants A map of the participants and their vote count
+ * @param contestPrompt The prompt for the contest
+ * @param contestStartedTimestamp The timestamp when the contest started
  * @param contestEndedTimestamp The timestamp when the contest ended
+ * @param contestNumber The ID of the contest
  */
 public record SeedContestResults(
-        HashMap<Long, Integer> participants,
-        String contestPrompt,
+        @NonNull HashMap<Long, Integer> participants,
+        @NonNull String contestPrompt,
+        long contestStartedTimestamp,
         long contestEndedTimestamp,
-        long leaderboardMessageId,
         int contestNumber
 ) {
+
     /**
-     * Gets the participants with the highest vote count
+     * Gets a list of participants with the highest vote count
      * @return An {@link ArrayList} of the participants sorted by vote count
      */
+    @NonNull
     public ArrayList<Long> getParticipants() {
         ArrayList<Long> winners = new ArrayList<>();
         int highestVoteCount = 0;
