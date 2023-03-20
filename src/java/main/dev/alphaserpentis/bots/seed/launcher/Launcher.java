@@ -3,31 +3,37 @@ package dev.alphaserpentis.bots.seed.launcher;
 import dev.alphaserpentis.bots.seed.commands.Contest;
 import dev.alphaserpentis.bots.seed.data.server.SeedServerData;
 import dev.alphaserpentis.bots.seed.handler.ContestHandler;
+import dev.alphaserpentis.bots.seed.handler.SeedServerDataHandler;
 import dev.alphaserpentis.coffeecore.core.CoffeeCore;
 import dev.alphaserpentis.coffeecore.core.CoffeeCoreBuilder;
 import dev.alphaserpentis.coffeecore.data.bot.BotSettings;
-import dev.alphaserpentis.coffeecore.handler.api.discord.servers.ServerDataHandler;
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.entities.Guild;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
 
 public class Launcher {
     public static CoffeeCore core;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
         Dotenv dotenv = Dotenv.load();
         CoffeeCoreBuilder builder = new CoffeeCoreBuilder();
         Guild guild;
 
         builder.setSettings(
                 new BotSettings(
-                        Long.getLong(dotenv.get("BOT_OWNER_ID")),
+                        Long.parseLong(dotenv.get("BOT_OWNER_ID")),
                         dotenv.get("SERVER_DATA_PATH"),
                         Boolean.parseBoolean(dotenv.get("UPDATE_COMMANDS_AT_LAUNCH")),
                         Boolean.parseBoolean(dotenv.get("REGISTER_DEFAULT_COMMANDS"))
                 )
-        ).setServerDataClass(SeedServerData.class);
+        ).setServerDataHandler(
+                SeedServerDataHandler.class.getDeclaredConstructor(
+                        Path.class
+                )
+        );
 
         core = builder.build(dotenv.get("DISCORD_BOT_TOKEN"));
         core.registerCommands(new Contest());
@@ -35,8 +41,9 @@ public class Launcher {
         guild = core.getJda().getGuildById(dotenv.get("GUILD_ID"));
 
         ContestHandler.init(
+                core,
                 guild,
-                (SeedServerData) ServerDataHandler.getServerData(guild.getIdLong())
+                (SeedServerData) core.getServerDataHandler().getServerData(guild.getIdLong())
         );
     }
 }

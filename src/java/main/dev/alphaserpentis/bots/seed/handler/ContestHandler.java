@@ -2,10 +2,9 @@ package dev.alphaserpentis.bots.seed.handler;
 
 import dev.alphaserpentis.bots.seed.data.contest.SeedContestResults;
 import dev.alphaserpentis.bots.seed.data.server.SeedServerData;
-import dev.alphaserpentis.coffeecore.handler.api.discord.servers.ServerDataHandler;
+import dev.alphaserpentis.coffeecore.core.CoffeeCore;
 import io.reactivex.rxjava3.annotations.NonNull;
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageHistory;
@@ -26,10 +25,10 @@ public class ContestHandler {
 
     public static ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(1);
     public static ScheduledFuture<?> scheduledFuture;
-    public static JDA jda;
+    public static CoffeeCore core;
 
-    public static void init(@NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
-        jda = guild.getJDA();
+    public static void init(@NonNull CoffeeCore core, @NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
+        ContestHandler.core = core;
 
         if(serverData.isContestRunning()) {
             // Verify the contest is still running
@@ -69,7 +68,7 @@ public class ContestHandler {
         );
         serverData.setContestStartingTimestamp(currentTimeInSeconds);
         serverData.addPromptToPreviouslyUsedPrompts(prompt);
-        ServerDataHandler.updateServerData();
+        core.getServerDataHandler().updateServerData();
 
         // Schedule the end of the contest
         scheduledFuture = executorService.schedule(
@@ -86,7 +85,7 @@ public class ContestHandler {
 
         // Construct the MessageEmbed
         eb.setTitle("Contest Started");
-        eb.setDescription("A new contest has started! The prompt for this contest is: " + prompt);
+        eb.setDescription("A new contest has started! The prompt for this contest is: \n\n**" + prompt + "**");
         eb.addField(
                 "Submitting Your Seed?",
                 "To submit your seed, simply upload your seed to this channel! If you submit more than one seed, the highest-scoring seed will be used.",
@@ -99,7 +98,7 @@ public class ContestHandler {
         );
         eb.addField(
                 "Contest Ends At",
-                "<t:" + serverData.getLengthOfContestInSeconds() + ":R>",
+                "<t:" + serverData.getContestEndingTimestamp() + ":R>",
                 false
         );
 
@@ -113,17 +112,25 @@ public class ContestHandler {
 
         scheduledFuture.cancel(false);
 
+        // Send a contest ending message
+        eb.setTitle("Contest Ended!");
+        eb.setDescription("The contest has ended! The results will be in <#" + serverData.getLeaderboardChannelId() + "> shortly!");
+        guild.getTextChannelById(serverData.getContestChannelId()).sendMessageEmbeds(
+                eb.build()
+        ).complete();
+
         // Set the contest results
         HashMap<Long, Integer> participants = getContestParticipants(serverData);
         SeedContestResults contestResults = new SeedContestResults(
                 participants,
-                serverData.getContestPrompt(),
+                serverData.getCurrentPrompt(),
                 serverData.getContestStartingTimestamp(),
                 serverData.getContestEndingTimestamp(),
                 serverData.getContestResults().size() + 1
         );
 
         // Construct the MessageEmbed
+        eb = new EmbedBuilder();
         eb.setTitle("Final Results");
         eb.setDescription("The contest has ended! Here are the final results:");
         eb.addField(
@@ -141,7 +148,7 @@ public class ContestHandler {
         }
 
         // Send messsage to the channel
-        guild.getTextChannelById(serverData.getContestChannelId()).sendMessageEmbeds(
+        guild.getTextChannelById(serverData.getLeaderboardChannelId()).sendMessageEmbeds(
                 eb.build()
         ).complete();
 
@@ -152,7 +159,7 @@ public class ContestHandler {
         } else {
             serverData.setContestStartingTimestamp(0);
             serverData.setContestEndingTimestamp(0);
-            ServerDataHandler.updateServerData();
+            core.getServerDataHandler().updateServerData();
         }
     }
 
@@ -163,7 +170,7 @@ public class ContestHandler {
     public static HashMap<Long, Integer> getContestParticipants(@NonNull SeedServerData serverData) {
         HashMap<Long, Integer> participants = new HashMap<>();
         ArrayList<Message> eligibleMessages = new ArrayList<>();
-        MessageChannel contestChannel = jda.getTextChannelById(serverData.getContestChannelId());
+        MessageChannel contestChannel = core.getJda().getTextChannelById(serverData.getContestChannelId());
         MessageHistory messageHistory;
         AtomicBoolean messagePastTimestamp = new AtomicBoolean(false);
 
@@ -185,9 +192,13 @@ public class ContestHandler {
                     }
             );
 
-            if(!messagePastTimestamp.get()) {
+            if(!messagePastTimestamp.get() && messageHistory.getRetrievedHistory().size() < 100)
+                messagePastTimestamp.set(true);
+
+            // If we haven't reached the end of the submissions
+            if(!messagePastTimestamp.get() && messageHistory.getRetrievedHistory().size() == 100) {
                 messageHistory = contestChannel.getHistoryBefore(
-                        messageHistory.getRetrievedHistory().get(0).getId(),
+                        messageHistory.getRetrievedHistory().get(messageHistory.getRetrievedHistory().size() - 1).getId(),
                         100
                 ).complete();
             }

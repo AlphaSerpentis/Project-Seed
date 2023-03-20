@@ -128,10 +128,14 @@ public class SeedServerData extends ServerData {
             throw new RuntimeException("Only one prompt has been added to the list of prompts. Please add more prompts.");
         } else {
             String prompt = getPrompts().get((int) (Math.random() * getPrompts().size()));
-            while(prompt.equals(getContestPrompt())) {
+            while(prompt.equals(previouslyUsedPrompts[0]) || prompt.equals(previouslyUsedPrompts[1]) || prompt.equals(previouslyUsedPrompts[2])) {
                 prompt = getPrompts().get((int) (Math.random() * getPrompts().size()));
             }
             return prompt;
         }
+    }
+
+    public String getCurrentPrompt() {
+        return previouslyUsedPrompts[2];
     }
 }
