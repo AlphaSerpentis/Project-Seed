@@ -135,7 +135,7 @@ public class ContestHandler {
         eb.setDescription("The contest has ended! Here are the final results:");
         eb.addField(
                 "Prompt",
-                serverData.getContestPrompt(),
+                contestResults.contestPrompt(),
                 false
         );
         for(int i = 0; i < contestResults.getParticipants().size() && i < 5; i++) {

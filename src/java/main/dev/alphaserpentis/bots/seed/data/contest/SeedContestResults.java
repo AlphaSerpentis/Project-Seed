@@ -4,6 +4,7 @@ import io.reactivex.rxjava3.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A record that stores the results of the contest
@@ -14,7 +15,7 @@ import java.util.HashMap;
  * @param contestNumber The ID of the contest
  */
 public record SeedContestResults(
-        @NonNull HashMap<Long, Integer> participants,
+        @NonNull Map<Long, Integer> participants,
         @NonNull String contestPrompt,
         long contestStartedTimestamp,
         long contestEndedTimestamp,

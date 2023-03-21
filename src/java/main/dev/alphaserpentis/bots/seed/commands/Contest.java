@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
@@ -66,6 +67,9 @@ public class Contest extends BotCommand<MessageEmbed> {
                 case "channel" -> setContestChannel(guild, event.getOptions().get(0).getAsLong(), eb, sdh);
                 case "length" -> setContestLength(guild, event.getOptions().get(0).getAsLong(), eb, sdh);
                 case "recurring" -> setContestRecurring(guild, event.getOptions().get(0).getAsBoolean(), eb, sdh);
+            }
+        } else {
+            switch(subcommand) {
                 case "contest" -> viewPastContests(guild, event.getOptions().get(0).getAsInt(), eb, sdh);
                 case "prompts" -> viewPrompts(guild, eb, sdh);
             }
@@ -92,7 +96,7 @@ public class Contest extends BotCommand<MessageEmbed> {
 
         SubcommandGroupData view = new SubcommandGroupData("view", "View contest-related information")
                 .addSubcommands(
-                        new SubcommandData("contest", "View past contests").addOption(OptionType.NUMBER, "id", "The ID of the contest to view.", true),
+                        new SubcommandData("contest", "View past contests").addOption(OptionType.INTEGER, "id", "The ID of the contest to view.", true),
                         new SubcommandData("prompts", "View the list of prompts added to the bot")
                 );
 
@@ -145,27 +149,28 @@ public class Contest extends BotCommand<MessageEmbed> {
     private void addPermission(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb, @NonNull SeedServerDataHandler sdh) {
         // Determine if id is a user or a role
         try {
-            guild.retrieveMemberById(id).queue((member) -> {
-                // It's a user
-                SeedServerData serverData = sdh.getServerData(guild.getIdLong());
-                serverData.addPermissionedUser(id);
-                eb.setDescription("The user has been added to the list of permissioned users.");
-                eb.setColor(0x00ff00);
-            }, (failure) -> {
-                // Verify that the id is a role and doesn't throw
-                if(guild.getRoleById(id) == null) {
-                    throw new NullPointerException("The mentionable could not be found.");
-                }
+            guild.retrieveMemberById(id).complete();
+
+            SeedServerData serverData = sdh.getServerData(guild.getIdLong());
+            serverData.addPermissionedUser(id);
+
+            eb.setDescription("<@" + id + "> has been added to the list of permissioned users.");
+            eb.setColor(0x00ff00);
+        } catch(ErrorResponseException e) {
+            if(guild.getRoleById(id) == null) {
+                eb.setDescription("The mentionable could not be found.");
+                eb.setColor(0xff0000);
+                return;
+            } else {
                 SeedServerData serverData = sdh.getServerData(guild.getIdLong());
                 serverData.addPermissionedRole(id);
-                eb.setDescription("The role has been added to the list of permissioned roles.");
+                eb.setDescription("<@&" + id + "> has been added to the list of permissioned roles.");
                 eb.setColor(0x00ff00);
-            });
+            }
+        }
 
+        try {
             sdh.updateServerData();
-        } catch(NullPointerException e) {
-            eb.setDescription("The mentionable could not be found.");
-            eb.setColor(0xff0000);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -174,27 +179,28 @@ public class Contest extends BotCommand<MessageEmbed> {
     private void removePermission(@NonNull Guild guild, long id, @NonNull EmbedBuilder eb, @NonNull SeedServerDataHandler sdh) {
         // Determine if id is a user or a role
         try {
-            guild.retrieveMemberById(id).queue((member) -> {
-                // It's a user
-                SeedServerData serverData = sdh.getServerData(guild.getIdLong());
-                serverData.removePermissionedUser(id);
-                eb.setDescription("The user has been removed from the list of permissioned users.");
-                eb.setColor(0x00ff00);
-            }, (failure) -> {
-                // Verify that the id is a role and doesn't throw
-                if(guild.getRoleById(id) == null) {
-                    throw new NullPointerException("The mentionable could not be found.");
-                }
+            guild.retrieveMemberById(id).complete();
+
+            SeedServerData serverData = sdh.getServerData(guild.getIdLong());
+            serverData.removePermissionedUser(id);
+
+            eb.setDescription("<@" + id + "> has been removed from the list of permissioned users.");
+            eb.setColor(0x00ff00);
+        } catch(ErrorResponseException e) {
+            if(guild.getRoleById(id) == null) {
+                eb.setDescription("The mentionable could not be found.");
+                eb.setColor(0xff0000);
+                return;
+            } else {
                 SeedServerData serverData = sdh.getServerData(guild.getIdLong());
                 serverData.removePermissionedRole(id);
-                eb.setDescription("The role has been removed from the list of permissioned roles.");
+                eb.setDescription("<@&" + id + "> has been removed from the list of permissioned roles.");
                 eb.setColor(0x00ff00);
-            });
+            }
+        }
 
+        try {
             sdh.updateServerData();
-        } catch(NullPointerException e) {
-            eb.setDescription("The mentionable could not be found.");
-            eb.setColor(0xff0000);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -292,7 +298,7 @@ public class Contest extends BotCommand<MessageEmbed> {
             eb.setTitle("Past Contest #" + contestId);
             eb.setDescription("The following are the results of the past contest.");
             eb.addField("Prompt", pastContest.contestPrompt(), false);
-            eb.addField("Winner", "@silent <@" + pastContest.getParticipants().get(0) + ">", false);
+            eb.addField("Winner", "<@" + pastContest.getParticipants().get(0) + ">", false);
             eb.addField("Entries", String.valueOf(pastContest.participants().size()), false);
             eb.addField("Date", "The contest happened from <t:" + pastContest.contestStartedTimestamp() + "> and ended at <t:" + pastContest.contestEndedTimestamp() + ">.", false);
             eb.setColor(0x00ff00);
