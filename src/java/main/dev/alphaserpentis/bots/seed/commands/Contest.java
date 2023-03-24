@@ -298,7 +298,7 @@ public class Contest extends BotCommand<MessageEmbed> {
             eb.setTitle("Past Contest #" + contestId);
             eb.setDescription("The following are the results of the past contest.");
             eb.addField("Prompt", pastContest.contestPrompt(), false);
-            eb.addField("Winner", "<@" + pastContest.getParticipants().get(0) + ">", false);
+            eb.addField("Winner", "<@" + pastContest.getSortedWinners().get(0) + ">", false);
             eb.addField("Entries", String.valueOf(pastContest.participants().size()), false);
             eb.addField("Date", "The contest happened from <t:" + pastContest.contestStartedTimestamp() + "> and ended at <t:" + pastContest.contestEndedTimestamp() + ">.", false);
             eb.setColor(0x00ff00);

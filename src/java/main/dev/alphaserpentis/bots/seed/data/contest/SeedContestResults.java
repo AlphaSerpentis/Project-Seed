@@ -27,7 +27,7 @@ public record SeedContestResults(
      * @return An {@link ArrayList} of the participants sorted by vote count
      */
     @NonNull
-    public ArrayList<Long> getParticipants() {
+    public ArrayList<Long> getSortedWinners() {
         ArrayList<Long> winners = new ArrayList<>();
         int highestVoteCount = 0;
 

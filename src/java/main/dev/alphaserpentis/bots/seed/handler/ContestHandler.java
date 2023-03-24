@@ -138,10 +138,26 @@ public class ContestHandler {
                 contestResults.contestPrompt(),
                 false
         );
-        for(int i = 0; i < contestResults.getParticipants().size() && i < 5; i++) {
-            long userId = contestResults.getParticipants().get(i);
+
+        long prevScore = 0;
+        long adjustedPlace = 0;
+        boolean previousWasTie = false;
+        for(int i = 0; i < contestResults.getSortedWinners().size() && i < 5 + adjustedPlace; i++) {
+            long score = contestResults.participants().get(contestResults.getSortedWinners().get(i));
+            if(prevScore == score && !previousWasTie) {
+                previousWasTie = true;
+            } else {
+                previousWasTie = false;
+                prevScore = score;
+            }
+
+            if(previousWasTie) {
+                adjustedPlace++;
+            }
+
+            long userId = contestResults.getSortedWinners().get(i);
             eb.addField(
-                    "Place " + (i + 1),
+                    "Place " + (i + 1 - adjustedPlace),
                     "<@" + userId + "> with " + contestResults.participants().get(userId) + " votes",
                     false
             );
@@ -205,7 +221,16 @@ public class ContestHandler {
         }
 
         for(Message msg: eligibleMessages) {
-            participants.put(msg.getAuthor().getIdLong(), countVotes(msg));
+            long authorId = msg.getAuthor().getIdLong();
+
+            if(participants.containsKey(authorId)) { // Checks if this user already participated
+                int voteCount = countVotes(msg);
+                if(participants.get(authorId) < voteCount) { // Only puts in the new submission if it received more votes
+                    participants.put(authorId, voteCount);
+                }
+            }
+
+            participants.put(authorId, countVotes(msg));
         }
 
         return participants;
