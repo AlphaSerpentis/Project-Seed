@@ -114,7 +114,7 @@ public class SeedServerData extends ServerData {
     }
 
     public boolean isContestRunning() {
-        return getContestEndingTimestamp() > System.currentTimeMillis() / 1000;
+        return getContestEndingTimestamp() > System.currentTimeMillis() / 1000 || getContestEndingTimestamp() != 0;
     }
 
     /**

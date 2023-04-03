@@ -34,14 +34,6 @@ public class ContestHandler {
             // Verify the contest is still running
             if(serverData.getContestEndingTimestamp() <= System.currentTimeMillis() / 1000) {
                 endContest(guild, serverData);
-                if(serverData.isContestRecurring()) {
-                    startContest(guild, serverData);
-                } else {
-                    serverData.setContestStartingTimestamp(0);
-                    serverData.setContestEndingTimestamp(0);
-
-                    endContest(guild, serverData);
-                }
             } else {
                 scheduledFuture = executorService.schedule(
                         () -> {
@@ -110,7 +102,8 @@ public class ContestHandler {
     public static void endContest(@NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
         EmbedBuilder eb = new EmbedBuilder();
 
-        scheduledFuture.cancel(false);
+        if(scheduledFuture != null)
+            scheduledFuture.cancel(false);
 
         // Send a contest ending message
         eb.setTitle("Contest Ended!");
@@ -142,8 +135,8 @@ public class ContestHandler {
         long prevScore = 0;
         long adjustedPlace = 0;
         boolean previousWasTie = false;
-        for(int i = 0; i < contestResults.getSortedWinners().size() && i < 5 + adjustedPlace; i++) {
-            long score = contestResults.participants().get(contestResults.getSortedWinners().get(i));
+        for(int i = 0; i < contestResults.getSortedParticipants().size() && i < 5 + adjustedPlace; i++) {
+            long score = contestResults.contestParticipants().get(contestResults.getSortedParticipants().get(i));
             if(prevScore == score && !previousWasTie) {
                 previousWasTie = true;
             } else {
@@ -155,10 +148,10 @@ public class ContestHandler {
                 adjustedPlace++;
             }
 
-            long userId = contestResults.getSortedWinners().get(i);
+            long userId = contestResults.getSortedParticipants().get(i);
             eb.addField(
-                    "Place " + (i + 1 - adjustedPlace),
-                    "<@" + userId + "> with " + contestResults.participants().get(userId) + " votes",
+                    "Place " + (i + 1 - adjustedPlace) + (previousWasTie ? " (Tie)" : ""),
+                    "<@" + userId + "> with " + contestResults.contestParticipants().get(userId) + " votes",
                     false
             );
         }

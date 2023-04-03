@@ -34,7 +34,7 @@ public class Contest extends BotCommand<MessageEmbed> {
                         "contest",
                         "Contest-related information and commands",
                         true,
-                        true,
+                        false,
                         TypeOfEphemeral.DEFAULT,
                         true
                 )
@@ -298,8 +298,8 @@ public class Contest extends BotCommand<MessageEmbed> {
             eb.setTitle("Past Contest #" + contestId);
             eb.setDescription("The following are the results of the past contest.");
             eb.addField("Prompt", pastContest.contestPrompt(), false);
-            eb.addField("Winner", "<@" + pastContest.getSortedWinners().get(0) + ">", false);
-            eb.addField("Entries", String.valueOf(pastContest.participants().size()), false);
+            eb.addField("Winner", "<@" + pastContest.getSortedParticipants().get(0) + ">", false);
+            eb.addField("Entries", String.valueOf(pastContest.contestParticipants().size()), false);
             eb.addField("Date", "The contest happened from <t:" + pastContest.contestStartedTimestamp() + "> and ended at <t:" + pastContest.contestEndedTimestamp() + ">.", false);
             eb.setColor(0x00ff00);
         } else {
