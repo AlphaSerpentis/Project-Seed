@@ -1,19 +1,21 @@
 package dev.alphaserpentis.bots.seed.data.server;
 
 import dev.alphaserpentis.bots.seed.data.contest.SeedContestResults;
+import dev.alphaserpentis.bots.seed.handler.OpenAIHandler;
 import dev.alphaserpentis.coffeecore.data.server.ServerData;
 import io.reactivex.rxjava3.annotations.NonNull;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class SeedServerData extends ServerData {
     private ArrayList<SeedContestResults> contestResults = new ArrayList<>();
     private ArrayList<Long> permissionedUsers = new ArrayList<>();
     private ArrayList<Long> permissionedRoles = new ArrayList<>();
     private ArrayList<String> prompts = new ArrayList<>();
-    private String[] previouslyUsedPrompts = new String[3];
+    private ArrayList<String> previouslyUsedPrompts = new ArrayList<>();
     private long leaderboardChannelId = 0;
     private long contestChannelId = 0;
     private long contestStartingTimestamp = 0;
@@ -82,9 +84,13 @@ public class SeedServerData extends ServerData {
         this.contestResults.add(contestResults);
     }
     public void addPromptToPreviouslyUsedPrompts(@NonNull String prompt) {
-        previouslyUsedPrompts[0] = previouslyUsedPrompts[1];
-        previouslyUsedPrompts[1] = previouslyUsedPrompts[2];
-        previouslyUsedPrompts[2] = prompt;
+        previouslyUsedPrompts.add(0, prompt);
+        if(previouslyUsedPrompts.size() > 6) {
+            previouslyUsedPrompts.remove(6);
+        }
+//        previouslyUsedPrompts[0] = previouslyUsedPrompts[1];
+//        previouslyUsedPrompts[1] = previouslyUsedPrompts[2];
+//        previouslyUsedPrompts[2] = prompt;
     }
     public void addPermissionedUser(long userId) {
         permissionedUsers.add(userId);
@@ -124,18 +130,30 @@ public class SeedServerData extends ServerData {
     public String getContestPrompt() {
         if(getPrompts().size() == 0) {
             throw new RuntimeException("No prompts have been added to the list of prompts.");
-        } else if(getPrompts().size() == 1) {
-            throw new RuntimeException("Only one prompt has been added to the list of prompts. Please add more prompts.");
+        } else if(getPrompts().size() < 6) {
+            throw new RuntimeException("Only " + getPrompts().size() + " prompt(s) have been added to the list of prompts. Please add at least six prompts.");
         } else {
-            String prompt = getPrompts().get((int) (Math.random() * getPrompts().size()));
-            while(prompt.equals(previouslyUsedPrompts[0]) || prompt.equals(previouslyUsedPrompts[1]) || prompt.equals(previouslyUsedPrompts[2])) {
-                prompt = getPrompts().get((int) (Math.random() * getPrompts().size()));
+            ArrayList<String> availablePrompts = new ArrayList<>(getPrompts());
+            String word1, word2;
+
+            prompts.removeIf(prompt -> previouslyUsedPrompts.contains(prompt));
+            word1 = availablePrompts.get((int) Math.floor(Math.random() * availablePrompts.size()));
+            availablePrompts.remove(word1);
+            word2 = availablePrompts.get((int) Math.floor(Math.random() * availablePrompts.size()));
+
+            // Verify that the prompt is 'safe'
+            if(OpenAIHandler.isPromptSafeToUse(word1 + " " + word2)) {
+                addPromptToPreviouslyUsedPrompts(word1);
+                addPromptToPreviouslyUsedPrompts(word2);
+                return word1 + " " + word2;
+            } else {
+                System.err.println("[SeedServerData] According to OpenAI, the prompt \"" + word1 + " " + word2 + "\" is not safe to use. Generating a new prompt...");
+                return getContestPrompt();
             }
-            return prompt;
         }
     }
 
     public String getCurrentPrompt() {
-        return previouslyUsedPrompts[2];
+        return previouslyUsedPrompts.get(0) + " " + previouslyUsedPrompts.get(1);
     }
 }

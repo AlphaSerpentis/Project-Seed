@@ -110,7 +110,7 @@ public class Contest extends BotCommand<MessageEmbed> {
                 eb.setDescription("A contest is already running.");
                 eb.setColor(0xff0000);
             } else {
-                eb.setDescription("The contest has been started.");
+                eb.setDescription("The contest has started.");
                 eb.setColor(0x00ff00);
 
                 try {
@@ -132,10 +132,11 @@ public class Contest extends BotCommand<MessageEmbed> {
     private void endContest(@NonNull Guild guild, @NonNull EmbedBuilder eb, @NonNull SeedServerDataHandler sdh) {
         SeedServerData serverData = sdh.getServerData(guild.getIdLong());
         if(serverData.isContestRunning()) {
-            eb.setDescription("The contest has been ended.");
+            eb.setDescription("The contest has ended." + (serverData.isContestRecurring() ? " **The recurring setting has been toggled off!**" : ""));
             eb.setColor(0x00ff00);
 
             try {
+                serverData.setContestRecurring(false);
                 ContestHandler.endContest(guild, serverData);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -315,9 +316,10 @@ public class Contest extends BotCommand<MessageEmbed> {
         if(prompts.size() > 0) {
             eb.setTitle("Prompts");
             eb.setDescription("Currently added prompts:");
-            for(int i = 0; i < prompts.size(); i++) {
-                eb.addField("Prompt #" + (i+1), prompts.get(i), false);
-            }
+//            for(int i = 0; i < prompts.size(); i++) {
+//                eb.addField("Prompt #" + (i+1), prompts.get(i), false);
+//            }
+            eb.addField("BIP39 List", "https://www.blockplate.com/pages/bip-39-wordlist", false);
             eb.setColor(0x00ff00);
         } else {
             eb.setDescription("There are no prompts available.");
