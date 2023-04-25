@@ -61,6 +61,7 @@ public class Contest extends BotCommand<MessageEmbed> {
                 case "end" -> endContest(guild, eb, sdh);
                 case "addperm" -> addPermission(guild, event.getOptions().get(0).getAsLong(), eb, sdh);
                 case "removeperm" -> removePermission(guild, event.getOptions().get(0).getAsLong(), eb, sdh);
+                case "setpromptlist" -> setPromptList(guild, event.getOptions().get(0).getAsString(), eb, sdh);
                 case "addprompt" -> addPrompt(guild, event.getOptions().get(0).getAsString(), eb, sdh);
                 case "removeprompt" -> removePrompt(guild, event.getOptions().get(0).getAsString(), eb, sdh);
                 case "leaderboard" -> setLeaderboardChannel(guild, event.getOptions().get(0).getAsLong(), eb, sdh);
@@ -86,8 +87,9 @@ public class Contest extends BotCommand<MessageEmbed> {
                         new SubcommandData("end", "End the contest. If a contest is running, it will be ended and the winner will be announced."),
                         new SubcommandData("addperm", "Adds a user or role to be permissioned to configure the contest.").addOption(OptionType.MENTIONABLE, "mention", "The user or role to add.", true),
                         new SubcommandData("removeperm", "Removes a user or role from being permissioned to configure the contest.").addOption(OptionType.MENTIONABLE, "mention", "The user or role to remove.", true),
-                        new SubcommandData("addprompt", "Adds a prompt to the list of prompts.").addOption(OptionType.STRING, "prompt", "The prompt to add.", true),
-                        new SubcommandData("removeprompt", "Removes a prompt from the list of prompts.").addOption(OptionType.STRING, "prompt", "The prompt to remove.", true),
+                        new SubcommandData("setpromptlist", "Sets the list of prompts for the contest.").addOption(OptionType.STRING, "url", "Direct URL to prompt list", true),
+                        new SubcommandData("addprompt", "Adds a SINGLE prompt to the list.").addOption(OptionType.STRING, "prompt", "The prompt to add.", true),
+                        new SubcommandData("removeprompt", "Removes a SINGLE prompt from the list.").addOption(OptionType.STRING, "prompt", "The prompt to remove.", true),
                         new SubcommandData("leaderboard", "Sets the channel where the leaderboard will be at").addOption(OptionType.CHANNEL, "channel", "The channel to set.", true),
                         new SubcommandData("channel", "Sets the channel where the contest will be at").addOption(OptionType.CHANNEL, "channel", "The channel to set.", true),
                         new SubcommandData("length", "Sets the length of the contest in days").addOption(OptionType.INTEGER, "days", "The number of days to set.", true),
@@ -207,6 +209,25 @@ public class Contest extends BotCommand<MessageEmbed> {
         }
     }
 
+    private void setPromptList(@NonNull Guild guild, @NonNull String promptListUrl, @NonNull EmbedBuilder eb, @NonNull SeedServerDataHandler sdh) {
+        SeedServerData serverData = sdh.getServerData(guild.getIdLong());
+        boolean result = serverData.pullAndUpdatePrompts(promptListUrl);
+
+        if(!result) {
+            eb.setDescription("The prompt list could not be set. Ensure that the URL is valid.");
+            eb.setColor(0xff0000);
+            return;
+        }
+        try {
+            sdh.updateServerData();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        eb.setDescription("The prompt list has been set.");
+        eb.setColor(0x00ff00);
+    }
+
     private void addPrompt(@NonNull Guild guild, @NonNull String prompt, @NonNull EmbedBuilder eb, @NonNull SeedServerDataHandler sdh) {
         SeedServerData serverData = sdh.getServerData(guild.getIdLong());
         serverData.addPrompt(prompt);
@@ -296,12 +317,15 @@ public class Contest extends BotCommand<MessageEmbed> {
         SeedContestResults pastContest = serverData.getContestResults().get(contestId-1);
 
         if(pastContest != null) {
+            long userId = pastContest.getSortedParticipants().get(0);
             eb.setTitle("Past Contest #" + contestId);
             eb.setDescription("The following are the results of the past contest.");
             eb.addField("Prompt", pastContest.contestPrompt(), false);
-            eb.addField("Winner", "<@" + pastContest.getSortedParticipants().get(0) + ">", false);
+            eb.addField("Winner", "<@" + userId + "> won with " + pastContest.contestParticipants().get(userId) + " votes", false);
             eb.addField("Entries", String.valueOf(pastContest.contestParticipants().size()), false);
             eb.addField("Date", "The contest happened from <t:" + pastContest.contestStartedTimestamp() + "> and ended at <t:" + pastContest.contestEndedTimestamp() + ">.", false);
+            if(pastContest.urlToWinningSeed() != null)
+                eb.setImage(pastContest.urlToWinningSeed());
             eb.setColor(0x00ff00);
         } else {
             eb.setDescription("There is no contest with that ID.");
@@ -319,7 +343,7 @@ public class Contest extends BotCommand<MessageEmbed> {
 //            for(int i = 0; i < prompts.size(); i++) {
 //                eb.addField("Prompt #" + (i+1), prompts.get(i), false);
 //            }
-            eb.addField("BIP39 List", "https://www.blockplate.com/pages/bip-39-wordlist", false);
+            eb.addField("Current List", serverData.getPromptsSource(), false);
             eb.setColor(0x00ff00);
         } else {
             eb.setDescription("There are no prompts available.");

@@ -27,6 +27,12 @@ import java.util.regex.Pattern;
 
 public class ContestHandler {
 
+    private record GetParticipantsResult(
+            HashMap<Long, Integer> participants,
+            ArrayList<Long> sortedParticipants,
+            String winningSubmissionurl
+    ) {}
+
     public static ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(1);
     public static ScheduledFuture<?> scheduledFuture;
     public static CoffeeCore core;
@@ -131,20 +137,22 @@ public class ContestHandler {
         ).complete();
 
         // Set the contest results
-        HashMap<Long, Integer> participants = getContestParticipants(serverData);
+        GetParticipantsResult participantsResult = getContestParticipants(serverData);
         SeedContestResults contestResults = new SeedContestResults(
-                participants,
+                participantsResult.participants(),
                 serverData.getCurrentPrompt(),
+                participantsResult.winningSubmissionurl(),
                 serverData.getContestStartingTimestamp(),
                 serverData.getContestEndingTimestamp(),
                 serverData.getContestResults().size() + 1
         );
 
-        if(participants.size() > 0) {
+        eb = new EmbedBuilder();
+        eb.setTitle("Final Results");
+        eb.setColor(color);
+
+        if(participantsResult.participants().size() > 0) {
             // Construct the MessageEmbed
-            eb = new EmbedBuilder();
-            eb.setTitle("Final Results");
-            eb.setColor(color);
             eb.setDescription("The contest has ended! Here are the final results:");
             eb.addField(
                     "Prompt",
@@ -212,15 +220,85 @@ public class ContestHandler {
                         }
                     }
 
-                    eb.setDescription(sb + " won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes!");
+                    eb.setDescription(sb + " won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes! Here is one of their winning submissions:");
                 } else {
-                    eb.setDescription("<@" + firstPlaceUsers.get(0) + "> won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes!");
+                    eb.setDescription("<@" + firstPlaceUsers.get(0) + "> won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes!\n\nHere is their winning submission:");
                 }
+                eb.setImage(contestResults.urlToWinningSeed());
 
                 guild.getTextChannelById(serverData.getContestChannelId()).sendMessageEmbeds(
                         eb.build()
                 ).setContent(getGeneratedEndContestPrompt(serverData.getCurrentPrompt())).complete();
+
+                // Send an updated leaderboard of all time
+                eb = new EmbedBuilder();
+                eb.setTitle("All Time Leaderboard Top 10");
+                eb.setColor(color);
+
+                StringBuilder boxedLeaderboard = new StringBuilder(
+                        """
+                        ```
+                        ╒═══╤══════════════╤═══════╤══════╕
+                        │ # │ User         │ Votes │🏆 🏆│
+                        ╞═══╪══════════════╪═══════╪══════╡
+                        """);
+
+                // Sort the leaderboard by the number of votes
+                HashMap<Long, Integer> allTimeParticipants = SeedContestResults.getParticipantsTotalVotes(serverData.getContestResults());
+                ArrayList<Long> sortedParticipants = SeedContestResults.getSortedParticipants(allTimeParticipants);
+
+                // Add the top 5 users to the leaderboard
+                for(int i = 0; i < sortedParticipants.size() && i < 10; i++) {
+                    long userId = sortedParticipants.get(i);
+                    int wins = 0;
+                    for(SeedContestResults results : serverData.getContestResults()) {
+                        if(results.contestParticipants().containsKey(userId)) {
+                            wins++;
+                        }
+                    }
+                    String username = guild.retrieveMemberById(userId).complete().getUser().getName();
+
+                    if(username.length() > 9) {
+                        username = username.substring(0, 9);
+                        username += "...";
+                    }
+
+                    boxedLeaderboard.append(
+                            String.format(
+                                    "│ %d │ %-12s │ %-5d │ %-4d │\n",
+                                    i + 1,
+                                    username,
+                                    allTimeParticipants.get(userId),
+                                    wins
+                            )
+                    );
+                }
+
+                // Add the bottom of the leaderboard
+                boxedLeaderboard.append("╘═══╧══════════════╧═══════╧══════╛```");
+                eb.addField("", boxedLeaderboard.toString(), false);
+
+                Message leaderboardMsg = guild.getTextChannelById(serverData.getLeaderboardChannelId()).sendMessageEmbeds(
+                        eb.build()
+                ).complete();
+
+                // Delete the old leaderboard
+                if(serverData.getLastLeaderboardMessageId() != 0)
+                    guild.getTextChannelById(serverData.getLeaderboardChannelId()).deleteMessageById(serverData.getLastLeaderboardMessageId()).complete();
+
+                // Add the leaderboard to the server data
+                serverData.setLastLeaderboardMessageId(leaderboardMsg.getIdLong());
             }
+        } else {
+            eb.setDescription("The contest has ended! Unfortunately, either no one voted on any seeds or no seeds were submitted. :(");
+            eb.addField(
+                    "Prompt",
+                    contestResults.contestPrompt(),
+                    false
+            );
+            guild.getTextChannelById(serverData.getLeaderboardChannelId()).sendMessageEmbeds(
+                    eb.build()
+            ).complete();
         }
 
         msg.delete().queue();
@@ -249,7 +327,8 @@ public class ContestHandler {
         return serverData.getContestChannelId() != 0 && serverData.getLeaderboardChannelId() != 0;
     }
 
-    public static HashMap<Long, Integer> getContestParticipants(@NonNull SeedServerData serverData) {
+    public static GetParticipantsResult getContestParticipants(@NonNull SeedServerData serverData) {
+        String winningSubmissionUrl = null;
         HashMap<Long, Integer> participants = new HashMap<>();
         ArrayList<Message> eligibleMessages = new ArrayList<>();
         MessageChannel contestChannel = core.getJda().getTextChannelById(serverData.getContestChannelId());
@@ -299,7 +378,23 @@ public class ContestHandler {
             participants.put(authorId, countVotes(msg));
         }
 
-        return participants;
+        // Get the winning submission URL
+        ArrayList<Long> sortedParticipants = SeedContestResults.getSortedParticipants(participants);
+        if(sortedParticipants.size() > 0) {
+            long winningUserId = sortedParticipants.get(0);
+            for(Message msg: eligibleMessages) {
+                if(msg.getAuthor().getIdLong() == winningUserId) {
+                    winningSubmissionUrl = msg.getAttachments().get(0).getUrl();
+                    break;
+                }
+            }
+        }
+
+        return new GetParticipantsResult(
+                participants,
+                sortedParticipants,
+                winningSubmissionUrl
+        );
     }
 
     public static int countVotes(@NonNull Message message) {

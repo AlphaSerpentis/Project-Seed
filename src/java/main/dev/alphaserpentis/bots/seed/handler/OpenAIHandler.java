@@ -46,7 +46,7 @@ public class OpenAIHandler {
                         0.,
                         0.,
                         null,
-                        "AMMY-POS-TEST"
+                        "POS"
                 )
         );
 
