@@ -7,32 +7,52 @@ import dev.alphaserpentis.bots.seed.handler.OpenAIHandler;
 import dev.alphaserpentis.bots.seed.handler.SeedServerDataHandler;
 import dev.alphaserpentis.coffeecore.core.CoffeeCore;
 import dev.alphaserpentis.coffeecore.core.CoffeeCoreBuilder;
+import dev.alphaserpentis.coffeecore.data.bot.AboutInformation;
 import dev.alphaserpentis.coffeecore.data.bot.BotSettings;
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
+import java.util.List;
 
 public class Launcher {
     public static CoffeeCore core;
 
-    public static void main(String[] args) throws IOException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    public static void main(String[] args) throws IOException {
         Dotenv dotenv = Dotenv.load();
-        CoffeeCoreBuilder builder = new CoffeeCoreBuilder();
+        CoffeeCoreBuilder<?> builder = new CoffeeCoreBuilder<>();
+        AboutInformation aboutInformation;
         Guild guild;
+
+        aboutInformation = new AboutInformation(
+                """
+                        A competition bot for FemboyDAO
+                        
+                        [GitHub](https://github.com/AlphaSerpentis/Project-Seed)
+                        """,
+                "v1.0.2",
+                null,
+                false,
+                false
+        );
 
         builder.setSettings(
                 new BotSettings(
                         Long.parseLong(dotenv.get("BOT_OWNER_ID")),
                         dotenv.get("SERVER_DATA_PATH"),
                         Boolean.parseBoolean(dotenv.get("UPDATE_COMMANDS_AT_LAUNCH")),
-                        Boolean.parseBoolean(dotenv.get("REGISTER_DEFAULT_COMMANDS"))
+                        Boolean.parseBoolean(dotenv.get("REGISTER_DEFAULT_COMMANDS")),
+                        aboutInformation
                 )
         ).setServerDataHandler(
-                SeedServerDataHandler.class.getDeclaredConstructor(
-                        Path.class
+                new SeedServerDataHandler(
+                        Path.of(dotenv.get("SERVER_DATA_PATH"))
+                )
+        ).setEnabledGatewayIntents(
+                List.of(
+                        GatewayIntent.MESSAGE_CONTENT
                 )
         );
 

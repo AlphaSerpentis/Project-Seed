@@ -4,24 +4,25 @@
 
     <groupId>dev.alphaserpentis.bots</groupId>
     <artifactId>Seed</artifactId>
-    <version>1.0</version>
+    <version>1.0.2</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <mainfile>dev.alphaserpentis.bots.seed.launcher.Launcher</mainfile>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>dev.alphaserpentis</groupId>
             <artifactId>CoffeeCore</artifactId>
-            <version>0.2.0-alpha.1</version>
+            <version>0.5.0-alpha-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.theokanning.openai-gpt3-java</groupId>
             <artifactId>service</artifactId>
-            <version>0.12.0</version>
+            <version>0.14.0</version>
         </dependency>
     </dependencies>
 
@@ -31,7 +32,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.4.2</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>make-assembly</id>

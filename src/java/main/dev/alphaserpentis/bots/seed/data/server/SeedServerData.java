@@ -210,6 +210,15 @@ public class SeedServerData extends ServerData {
     }
 
     public String getCurrentPrompt() {
+        if(previouslyUsedPrompts.size() == 1) {
+            return previouslyUsedPrompts.get(0);
+        }
+
+        // Check if the last prompt was a single word.
+        if(previouslyUsedPrompts.get(0).contains(" ")) {
+            return previouslyUsedPrompts.get(0);
+        }
+
         return previouslyUsedPrompts.get(0) + " " + previouslyUsedPrompts.get(1);
     }
 }

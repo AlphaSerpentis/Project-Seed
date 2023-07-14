@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageHistory;
 import net.dv8tion.jda.api.entities.MessageReaction;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 
 import java.awt.*;
 import java.io.IOException;
@@ -25,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static dev.alphaserpentis.bots.seed.data.contest.Prompts.*;
+
 public class ContestHandler {
 
     private record GetParticipantsResult(
@@ -36,10 +39,6 @@ public class ContestHandler {
     public static ScheduledExecutorService executorService = new ScheduledThreadPoolExecutor(1);
     public static ScheduledFuture<?> scheduledFuture;
     public static CoffeeCore core;
-    private static final String COLOR_PROMPT = "Give me a fitting color in hex code based on this prompt: ";
-    private static final String START_CONTEST_PROMPT = "You're a femboy and you have a crazy game where femboys have to submit pictures related to some words. Write a quick exciting prompt to have them submit pictures, knowing the word of the round is ";
-    private static final String END_CONTEST_PROMPT = "You're a femboy and you have a crazy game where femboys have to submit pictures related to some words. However, the game has come to an end and you'll be congratulating the winner! Write a quick exciting prompt to congratulate the winner or winners, knowing the contest's prompt was ";
-    private static final String EMOJIS_PROMPT = "Give me ONLY up to THREE fitting emojis without any other text for Discord based on this prompt: ";
 
     public static void init(@NonNull CoffeeCore core, @NonNull Guild guild, @NonNull SeedServerData serverData) throws IOException {
         ContestHandler.core = core;
@@ -220,11 +219,14 @@ public class ContestHandler {
                         }
                     }
 
-                    eb.setDescription(sb + " won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes! Here is one of their winning submissions:");
+                    eb.setDescription(sb + " won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes! Here is one of their winning submissions:\n\n[Attachment](" + contestResults.urlToWinningSeed() + ")");
+                    eb.setImage(contestResults.urlToWinningSeed());
+                } else if(firstPlaceUsers.size() == 1) {
+                    eb.setDescription("<@" + firstPlaceUsers.get(0) + "> won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes!\n\nHere is their winning submission:\n\n[Attachment](" + contestResults.urlToWinningSeed() + ")");
+                    eb.setImage(contestResults.urlToWinningSeed());
                 } else {
-                    eb.setDescription("<@" + firstPlaceUsers.get(0) + "> won the contest with " + contestResults.contestParticipants().get(firstPlaceUsers.get(0)) + " votes!\n\nHere is their winning submission:");
+                    eb.setDescription("Nobody won the contest!");
                 }
-                eb.setImage(contestResults.urlToWinningSeed());
 
                 guild.getTextChannelById(serverData.getContestChannelId()).sendMessageEmbeds(
                         eb.build()
@@ -256,7 +258,13 @@ public class ContestHandler {
                             wins++;
                         }
                     }
-                    String username = guild.retrieveMemberById(userId).complete().getUser().getName();
+                    String username;
+
+                    try {
+                        username = guild.retrieveMemberById(userId).complete().getUser().getName();
+                    } catch(ErrorResponseException e) {
+                        username = "(" + userId + ")";
+                    }
 
                     if(username.length() > 9) {
                         username = username.substring(0, 9);
@@ -440,12 +448,12 @@ public class ContestHandler {
     public static String getGeneratedNewContestPrompt(@NonNull String prompt) {
         ChatCompletionResult result = OpenAIHandler.getCompletion(START_CONTEST_PROMPT + prompt);
 
-        return result.getChoices().get(0).getMessage().getContent().substring(1, result.getChoices().get(0).getMessage().getContent().length() - 1);
+        return result.getChoices().get(0).getMessage().getContent();
     }
 
     public static String getGeneratedEndContestPrompt(@NonNull String prompt) {
         ChatCompletionResult result = OpenAIHandler.getCompletion(END_CONTEST_PROMPT + prompt);
 
-        return result.getChoices().get(0).getMessage().getContent().substring(1, result.getChoices().get(0).getMessage().getContent().length() - 1);
+        return result.getChoices().get(0).getMessage().getContent();
     }
 }

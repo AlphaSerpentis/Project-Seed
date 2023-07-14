@@ -20,7 +20,7 @@ import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
 import java.io.IOException;
 import java.util.List;
 
-public class Contest extends BotCommand<MessageEmbed> {
+public class Contest extends BotCommand<MessageEmbed, SlashCommandInteractionEvent> {
 
     private static final MessageEmbed PERMISSION_DENIED = new EmbedBuilder()
             .setTitle("Permission Denied")
@@ -30,14 +30,12 @@ public class Contest extends BotCommand<MessageEmbed> {
 
     public Contest() {
         super(
-                new BotCommandOptions(
-                        "contest",
-                        "Contest-related information and commands",
-                        true,
-                        false,
-                        TypeOfEphemeral.DEFAULT,
-                        true
-                )
+                new BotCommandOptions()
+                        .setName("contest")
+                        .setDescription("Contest-related information and commands")
+                        .setOnlyEmbed(true)
+                        .setOnlyEphemeral(false)
+                        .setDeferReplies(true)
         );
     }
 
@@ -340,9 +338,6 @@ public class Contest extends BotCommand<MessageEmbed> {
         if(prompts.size() > 0) {
             eb.setTitle("Prompts");
             eb.setDescription("Currently added prompts:");
-//            for(int i = 0; i < prompts.size(); i++) {
-//                eb.addField("Prompt #" + (i+1), prompts.get(i), false);
-//            }
             eb.addField("Current List", serverData.getPromptsSource(), false);
             eb.setColor(0x00ff00);
         } else {
